@@ -14,6 +14,8 @@ class Piece:
         self.type = type
         self.grid = [[0 for x in range(4)] for y in range(4)]
         self.color = (0, 0, 0)
+        self.position = (0, 0)
+        self.rotation = rotation
         self.set_piece()
         self.rotate_piece(rotation)
 
@@ -39,6 +41,7 @@ class Piece:
         elif self.type == 7:
             self.grid = [[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0], [0, 0, 0, 0]]
             self.color = (238, 230, 133)
+        self.position = (0, 3)
 
     def rotate_piece(self, rotation):
         for i in range(rotation):
@@ -61,10 +64,12 @@ class Tetris:
         self.level_index = 60
         self.empty_box_color = (20, 20, 20)
         self.filled_box_color = (80, 80, 80)
+        self.current_piece = None
         self.grid = [[0 for x in range(self.WIDTH)] for y in range(self.HEIGHT)]
         self.initialize_grid(level)
 
     def new_piece(self, piece):
+        """
         temp, skip = (0,) * 2
         for i in range(len(piece.grid)):
             for j in range(len(piece.grid[i])):
@@ -73,8 +78,46 @@ class Tetris:
                 skip += 1
             else:
                 for j in range(len(piece.grid[i])):
-                    self.grid[i-skip][j+3] = (False, self.empty_box_color) if piece.grid[i][j] == 0 else (True, piece.color)
+                    self.grid[i - skip][j + 3] = (False, self.empty_box_color, False) if \
+                        piece.grid[i][j] == 0 else (True, piece.color, True)
+        """
+        self.current_piece = piece
         self.slim_piece(piece)
+
+    def move_left(self):
+        if self.current_piece.position[1] > 0:
+            self.current_piece.position = (self.current_piece.position[0], self.current_piece.position[1] - 1)
+
+    def move_right(self):
+        if self.current_piece.position[1] + 4 < self.WIDTH:
+            self.current_piece.position = (self.current_piece.position[0], self.current_piece.position[1] + 1)
+
+    def move_down(self):
+        if self.current_piece.position[0] + 4 < self.HEIGHT:
+            self.current_piece.position = (self.current_piece.position[0] + 1, self.current_piece.position[1])
+
+    def rotate(self):
+        self.current_piece.rotate_piece(1)
+
+    def clean_last(self):
+        if self.current_piece is None:
+            return
+        for i in range(
+                    self.current_piece.position[0] - 1
+                    if self.current_piece.position[0] - 1 >= 0
+                    else self.current_piece.position[0],
+                    self.current_piece.position[0] + 5
+                    if self.current_piece.position[0] + 5 < self.HEIGHT
+                    else self.HEIGHT):
+            for j in range(
+                    self.current_piece.position[1] - 1
+                    if self.current_piece.position[1] - 1 >= 0
+                    else self.current_piece.position[0],
+                    self.current_piece.position[1] + 5
+                    if self.current_piece.position[1] + 5 < self.WIDTH
+                    else self.WIDTH):
+                if self.grid[i][j][2]:
+                    self.grid[i][j] = (False, self.empty_box_color, False)
 
     def slim_piece(self, piece):
         up, down, right, left, temp_up, temp_down, temp_right, temp_left = (0,) * 8
@@ -99,8 +142,6 @@ class Tetris:
                         temp_grid[x][y] = piece.grid[i][j]
                         y += 1
                 x += 1
-        # print("slim up", up, "down", down, "left", left, "right", right)
-        # print(temp_grid)
         return temp_grid
 
     def initialize_grid(self, level):
@@ -130,13 +171,24 @@ class Tetris:
 
         for j in range(self.HEIGHT):
             for i in range(self.WIDTH):
-                pygame.draw.rect(win, self.grid[j][i][1],
+                color = self.grid[j][i][1]
+                if self.current_piece.position[0] <= j < self.current_piece.position[0] + 4:
+                    if self.current_piece.position[1] <= i < self.current_piece.position[1] + 4:
+                        print("i j:", j, i)
+                        m = j - self.current_piece.position[0]
+                        n = i - self.current_piece.position[1]
+                        print("m n:", m, n)
+                        if self.current_piece.grid[m][n]:
+                            color = self.current_piece.color
+                        else:
+                            color = (255, 255, 255)
+                pygame.draw.rect(win, color,
                                  pygame.Rect((infoObject.current_w / 2) - ((self.box_size + self.box_margin)
                                                                            * self.WIDTH / 2) + (
-                                                         i * (self.box_size + self.box_margin)),
+                                                     i * (self.box_size + self.box_margin)),
                                              (infoObject.current_h / 2) - ((self.box_size + self.box_margin)
                                                                            * self.HEIGHT / 2) + (
-                                                         j * (self.box_size + self.box_margin)),
+                                                     j * (self.box_size + self.box_margin)),
                                              self.box_size, self.box_size))
         pygame.display.flip()
 
@@ -145,20 +197,29 @@ myTetris = Tetris(6)
 alive = True
 while alive:
 
+    if myTetris.current_piece is None:
+        # myTetris.clean_last()
+        myTetris.new_piece(Piece(random.randint(1, 7), random.randint(0, 3)))
+
     myTetris.refresh_board()
     for event in pygame.event.get():
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
                 print('Left')
+                myTetris.move_left()
             elif event.key == pygame.K_RIGHT:
                 print('Right')
+                myTetris.move_right()
             elif event.key == pygame.K_UP:
                 print('Up')
+                myTetris.rotate()
             elif event.key == pygame.K_DOWN:
                 print('Down')
+                myTetris.move_down()
             elif event.key == pygame.K_z:
                 myTetris.new_piece(Piece(random.randint(1, 7), random.randint(0, 3)))
             elif event.key == pygame.K_q:
                 alive = False
+            print("Position", None if myTetris.current_piece is None else myTetris.current_piece.position)
 
 pygame.quit()
